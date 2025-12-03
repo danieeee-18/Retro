@@ -2,12 +2,13 @@
 
     <h2>Ultimas entradas del blog</h2>
 
-    <div class="posts-grid">
+    <div class="rejilla-entradas">
         <% posts.forEach(post => { %>
-            <article class="card">
+            <article class="tarjeta">
                 <a href="/post/<%= post.id %>">
                     <img src="<%= post.image %>" alt="<%= post.title %>">
-                    <div class="card-overlay">
+                    
+                    <div class="capa-titulo">
                         <h3><%= post.title %></h3>
                     </div>
                 </a>
