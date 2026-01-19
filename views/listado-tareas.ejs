@@ -1,0 +1,10 @@
+<h3>Mis Tareas</h3>
+<div style="display:flex; flex-wrap:wrap; gap:10px;">
+  <% tareas.forEach((t) => { %>
+    <div style="border:1px solid #333; padding:10px; width:200px;">
+        <h4><%= t.titulo %></h4>
+        <p><%= t.descripcion %></p>
+        <small><%= t.fecha_creacion %></small>
+    </div>
+  <% }) %>
+</div>

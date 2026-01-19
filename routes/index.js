@@ -1,44 +1,76 @@
 var express = require('express');
 var router = express.Router();
-// Importamos nuestro proveedor de datos (equivalente a dataService)
-var dataProvider = require('../data/dataProvider');
+var authMiddleware = require('../middlewares/auth');
+var Database = require('../data/database');
+const UsuarioDAO = require("../data/usuario-dao");
+const TareaDAO = require('../data/tarea-dao');
+
+// --- INICIALIZACIÓN DE LA BASE DE DATOS ---
+// Esto crea el archivo db.sqlite si no existe y conecta las tablas
+var db = Database.getInstance("db.sqlite");
+var dao = new UsuarioDAO(db);
+var datoTareas = new TareaDAO(db);
+
+
+// --- RUTAS PÚBLICAS ---
 
 /* GET home page. */
-// El profesor usa router.get('/', ...) y renderiza 'index' pasando los datos.
 router.get('/', function(req, res, next) {
-  // Usamos el nuevo nombre de la función
-  const items = dataProvider.findAllPosts();
-  const categories = dataProvider.getCategories();
-  
-  // Pasamos 'posts' (equivalente a 'productos' del profesor)
-  res.render('index', { posts: items, categories: categories });
+  // AQUÍ ESTABA EL ERROR: Añadimos { title: ... } para que la vista lo reconozca
+  res.render('index', { title: 'Todo List App' }); 
 });
 
-/* GET detalle del post */
-// El profesor usa "/producto/:pid". Nosotros usaremos "/post/:id"
-router.get('/post/:id', function(req, res, next) {
-  const id = req.params.id;
-  // Usamos el nuevo nombre de la función
-  const item = dataProvider.findPostById(id);
-  const categories = dataProvider.getCategories();
+/* GET Login - Formulario de acceso */
+router.get('/login', function(req, res, next) {
+  res.render('login', { title: 'Iniciar Sesión' });
+});
 
-  if(item) {
-    // Pasamos 'post' (equivalente a 'item' en el código del profesor)
-    res.render('post', { post: item, categories: categories });
+/* POST Login - Procesar credenciales */
+router.post('/login', function(req, res, next) {
+  const user = dao.findUserByEmail(req.body.name);
+
+  // Si el usuario no existe, volvemos al inicio mostrando un error (opcionalmente)
+  if(!user) {
+      return res.render('index', { title: 'Usuario no encontrado' });
+  }
+
+  // Verificamos contraseña (en un caso real usaríamos hash/bcrypt)
+  if(req.body.password === user.password){
+    // Guardamos usuario en sesión
+    req.session.user = { email: user.email, id: user.id };
+    res.redirect("/admin");
   } else {
-    res.status(404).render('error', {message: "Post no encontrado"});
+    res.render('index', { title: 'Contraseña incorrecta' });
   }
 });
 
-/* Filtrado por categoría */
-router.get('/category/:name', function(req, res, next) {
-    const catName = req.params.name;
-    const allPosts = dataProvider.findAllPosts();
-    // Filtramos
-    const filtered = allPosts.filter(p => p.category === catName);
-    const categories = dataProvider.getCategories();
-    
-    res.render('index', { posts: filtered, categories: categories });
+/* GET Logout - Cerrar sesión */
+router.get('/logout', function(req, res, next) {
+  req.session.user = null;
+  res.redirect('/');
+});
+
+
+// --- RUTAS PRIVADAS (ADMIN) ---
+
+/* GET Admin - Panel principal */
+router.get('/admin', authMiddleware, function(req, res, next) {
+  // Buscamos las tareas de ESTE usuario específico
+  let salida = datoTareas.findTareasByUserId(req.session.user.id);
+  
+  res.render('admin', { 
+      title: 'Panel de Administración',
+      user: req.session.user, 
+      layout: 'layout-admin', // Usamos el diseño diferente para admin
+      tareas: salida 
+  });
+});
+
+/* POST Insertar Tarea */
+router.post("/tareas/insertar", authMiddleware, function(req, res, next) {
+  // Guardamos la tarea vinculada al ID del usuario en sesión
+  datoTareas.saveTarea(req.session.user.id, req.body.titulo, req.body.descripcion);
+  res.redirect("/admin");
 });
 
 module.exports = router;
