@@ -11,5 +11,6 @@ module.exports = (db) => {
     if(count.total === 0){
         // Crea usuario admin por defecto (pass: admin)
         db.prepare('INSERT INTO usuarios (id, email, password) VALUES (?, ?, ?)').run(1, 'admin', 'admin');
+        db.prepare('INSERT INTO usuarios (nombre, email, password) VALUES (?, ?, ?)').run(2, 'admin', 'admin@test.com', '1234');
     }
 }

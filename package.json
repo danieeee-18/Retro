@@ -2,11 +2,25 @@
   "name": "retro",
   "version": "0.0.0",
   "private": true,
+  "description": "",
+  "homepage": "https://github.com/danieeee-18/Retro#readme",
+  "bugs": {
+    "url": "https://github.com/danieeee-18/Retro/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danieeee-18/Retro.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "app.js",
   "scripts": {
     "start": "node ./bin/www"
   },
   "dependencies": {
     "better-sqlite3": "^12.6.0",
+    "bootstrap": "^5.3.8",
     "cookie-parser": "~1.4.4",
     "debug": "~2.6.9",
     "ejs": "^3.1.10",
@@ -16,8 +30,5 @@
     "http-errors": "~1.6.3",
     "morgan": "^1.10.1"
   },
-  "main": "app.js",
-  "author": "",
-  "license": "ISC",
-  "description": ""
+  "devDependencies": {}
 }

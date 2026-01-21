@@ -14,42 +14,47 @@ var app = express();
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
-// Usar express-ejs-layouts para plantillas maestras
 app.use(expressLayouts);
-app.set('layout', 'layout'); // busca por defecto views/layout.ejs
-
 app.use(logger('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
+
+// Archivos estáticos originales (tu carpeta public)
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Configuración de Sesión
+// --- NUEVA LÍNEA PARA BOOTSTRAP LOCAL ---
+// Esto permite acceder a bootstrap en: /bootstrap/css/... y /bootstrap/js/...
+app.use('/bootstrap', express.static(path.join(__dirname, 'node_modules/bootstrap/dist')));
+// ----------------------------------------
+
+// Configuración de la sesión
 app.use(expressSession({
-  secret: 'mi-clave-secreta-supersegura',
+  secret: 'secret', // Recuerda cambiar esto por una variable de entorno en producción
   resave: false,
-  saveUninitialized: true,
-  cookie: { secure: false } // false para http localhost
+  saveUninitialized: false
 }));
 
-// Middleware global para log (opcional)
 app.use((req, res, next) => {
-  console.log(`Petición en ${req.hostname} a las ${(new Date()).toISOString()}`);
+  res.locals.usuario = req.session.usuario;
   next();
 });
 
 // Rutas
 app.use('/', indexRouter);
 
-// Catch 404
+// Manejo de errores 404
 app.use(function(req, res, next) {
   next(createError(404));
 });
 
-// Error handler
+// Manejador de errores
 app.use(function(err, req, res, next) {
+  // set locals, only providing error in development
   res.locals.message = err.message;
   res.locals.error = req.app.get('env') === 'development' ? err : {};
+
+  // render the error page
   res.status(err.status || 500);
   res.render('error');
 });

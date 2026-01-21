@@ -1,76 +1,110 @@
 var express = require('express');
 var router = express.Router();
-var authMiddleware = require('../middlewares/auth');
-var Database = require('../data/database');
-const UsuarioDAO = require("../data/usuario-dao");
+var path = require('path'); // <--- 1. Necesitamos esto para las rutas de archivos
+
+// 2. Importamos la base de datos y los modelos
+const Database = require('../data/database');
+const UsuarioDAO = require('../data/usuario-dao');
 const TareaDAO = require('../data/tarea-dao');
 
-// --- INICIALIZACIÓN DE LA BASE DE DATOS ---
-// Esto crea el archivo db.sqlite si no existe y conecta las tablas
-var db = Database.getInstance("db.sqlite");
-var dao = new UsuarioDAO(db);
-var datoTareas = new TareaDAO(db);
+// 3. Importamos el middleware de seguridad
+const auth = require('../middlewares/auth');
 
+// 4. INICIALIZAMOS LA CONEXIÓN
+// Le decimos que busque 'db.sqlite' en la carpeta superior (la raíz del proyecto)
+const dbPath = path.join(__dirname, '../db.sqlite'); 
+const db = Database.getInstance(dbPath); // <--- ¡Aquí estaba el fallo antes!
 
-// --- RUTAS PÚBLICAS ---
+// Inicializamos los DAOs con la conexión
+const daoUsuarios = new UsuarioDAO(db);
+const daoTareas = new TareaDAO(db);
 
-/* GET home page. */
+/* --- RUTA PÚBLICA: LOGIN --- */
 router.get('/', function(req, res, next) {
-  // AQUÍ ESTABA EL ERROR: Añadimos { title: ... } para que la vista lo reconozca
-  res.render('index', { title: 'Todo List App' }); 
+  res.render('login', { layout: 'layout' });
 });
 
-/* GET Login - Formulario de acceso */
-router.get('/login', function(req, res, next) {
-  res.render('login', { title: 'Iniciar Sesión' });
-});
+router.post('/login', async function(req, res, next) {
+  const { email, password } = req.body;
+  
+  try {
+    const usuario = await daoUsuarios.obtenerPorEmail(email); 
 
-/* POST Login - Procesar credenciales */
-router.post('/login', function(req, res, next) {
-  const user = dao.findUserByEmail(req.body.name);
-
-  // Si el usuario no existe, volvemos al inicio mostrando un error (opcionalmente)
-  if(!user) {
-      return res.render('index', { title: 'Usuario no encontrado' });
+    if (usuario && usuario.password === password) {
+      req.session.usuario = { 
+        id: usuario.id, 
+        email: usuario.email, 
+        nombre: usuario.nombre 
+      };
+      res.redirect('/tareas');
+    } else {
+      res.render('login', { 
+        layout: 'layout', 
+        error: 'Credenciales incorrectas' 
+      });
+    }
+  } catch (err) {
+    console.error(err);
+    res.render('login', { 
+      layout: 'layout', 
+      error: 'Error en el servidor al intentar iniciar sesión' 
+    });
   }
-
-  // Verificamos contraseña (en un caso real usaríamos hash/bcrypt)
-  if(req.body.password === user.password){
-    // Guardamos usuario en sesión
-    req.session.user = { email: user.email, id: user.id };
-    res.redirect("/admin");
-  } else {
-    res.render('index', { title: 'Contraseña incorrecta' });
-  }
 });
 
-/* GET Logout - Cerrar sesión */
-router.get('/logout', function(req, res, next) {
-  req.session.user = null;
+router.get('/logout', function(req, res) {
+  req.session.destroy();
   res.redirect('/');
 });
 
+/* --- RUTAS PRIVADAS: PANEL DE ADMINISTRACIÓN --- */
 
-// --- RUTAS PRIVADAS (ADMIN) ---
+// 1. Listado de tareas
+router.get('/tareas', auth, async function(req, res, next) {
+  try {
+    // Si tu DAO pide el ID del usuario, pásaselo. Si no, quita el argumento.
+    // Asumo que obtenerTodas filtra por usuario:
+    const tareas = await daoTareas.obtenerTodas(req.session.usuario.id);
+    
+    res.render('listado-tareas', { 
+      layout: 'layout-admin', 
+      tareas: tareas,
+      usuario: req.session.usuario
+    });
+  } catch (err) {
+    console.error(err);
+    next(err);
+  }
+});
 
-/* GET Admin - Panel principal */
-router.get('/admin', authMiddleware, function(req, res, next) {
-  // Buscamos las tareas de ESTE usuario específico
-  let salida = datoTareas.findTareasByUserId(req.session.user.id);
-  
-  res.render('admin', { 
-      title: 'Panel de Administración',
-      user: req.session.user, 
-      layout: 'layout-admin', // Usamos el diseño diferente para admin
-      tareas: salida 
+// 2. Formulario para nueva tarea
+router.get('/tareas/crear', auth, function(req, res, next) {
+  res.render('formulario-tarea', { 
+    layout: 'layout-admin',
+    usuario: req.session.usuario
   });
 });
 
-/* POST Insertar Tarea */
-router.post("/tareas/insertar", authMiddleware, function(req, res, next) {
-  // Guardamos la tarea vinculada al ID del usuario en sesión
-  datoTareas.saveTarea(req.session.user.id, req.body.titulo, req.body.descripcion);
-  res.redirect("/admin");
+// 3. Guardar la tarea
+router.post('/tareas/insertar', auth, async function(req, res, next) {
+  const { descripcion } = req.body;
+  
+  if(descripcion) {
+    await daoTareas.insertar(descripcion, req.session.usuario.id);
+  }
+  
+  res.redirect('/tareas');
+});
+
+// 4. Eliminar tarea
+router.post('/tareas/eliminar', auth, async function(req, res, next) {
+  const { id } = req.body;
+  
+  if(id) {
+    await daoTareas.borrar(id); 
+  }
+  
+  res.redirect('/tareas');
 });
 
 module.exports = router;
